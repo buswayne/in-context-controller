@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Black">
+    <option name="sdkName" value="sysid-transformers-control" />
+  </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.10.12 (sftp://rbusetto@chronos.idsia.ch:8003/home/rbusetto/.virtualenvs/sysid-transformers-control/bin/python3.10)" project-jdk-type="Python SDK" />
+</project>
