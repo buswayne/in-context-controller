@@ -66,9 +66,9 @@ if __name__ == '__main__':
                         help='Saved model folder')
     parser.add_argument('--out-file', type=str, default="ckpt_onestep_lin_CL", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_lin", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_lin_CL", metavar='S',
                         help='Loaded model name (when resuming)')
-    parser.add_argument('--init-from', type=str, default="pretrained", metavar='S',
+    parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
     parser.add_argument('--seed', type=int, default=42, metavar='N',
                         help='Seed for random number generation')
@@ -210,6 +210,7 @@ if __name__ == '__main__':
 
     # Optimizer
     optimizer = model.configure_optimizers(cfg.weight_decay, cfg.lr, (cfg.beta1, cfg.beta2), device_type)
+
     if cfg.init_from == "resume":
         optimizer.load_state_dict(checkpoint['optimizer'])
 
@@ -221,7 +222,8 @@ if __name__ == '__main__':
     LOSS_VAL = []
     best_val_loss = float('inf')
 
-    if cfg.init_from == "scratch" or cfg.init_from == "pretrained":
+    if cfg.init_from == ("scrat"
+                         "ch") or cfg.init_from == "pretrained":
         iter_num = 0
         best_val_loss = np.inf
     elif cfg.init_from == "resume":
