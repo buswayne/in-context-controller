@@ -5,10 +5,10 @@ import numpy as np
 import math
 import gc
 from functools import partial
-from dataset_CL import LinearCLDataset
+from dataset_CL import whCLDataset
 from torch.utils.data import DataLoader
 from transformer_onestep import GPTConfig, GPT, warmup_cosine_lr
-from transformer_onestep_CL import GPTClosedLoop
+from transformer_onestep_CL_WH import GPTClosedLoop
 import tqdm
 import argparse
 import warnings
@@ -27,11 +27,11 @@ def train(model, dataloader, criterion, optimizer, device):
     model.train()
     running_loss = 0.0
     for batch in dataloader:
-        batch_G, batch_r, batch_y_d = batch
+        batch_G1, batch_G2, nn_params, batch_r, batch_y_d = batch
         batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
         optimizer.zero_grad()
-        batch_y = model(batch_G, batch_r)
+        batch_y = model(batch_G1, batch_G2, nn_params, batch_r)
         loss = criterion(batch_y, batch_y_d)
         loss.backward()
         optimizer.step()
@@ -46,10 +46,10 @@ def validate(model, dataloader, criterion, device):
     running_loss = 0.0
     with torch.no_grad():
         for batch in dataloader:
-            batch_G, batch_r, batch_y_d = batch
+            batch_G1, batch_G2, nn_params, batch_r, batch_y_d = batch
             batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
-            batch_y = model(batch_G, batch_r)
+            batch_y = model(batch_G1, batch_G2, nn_params, batch_r)
             loss = criterion(batch_y, batch_y_d)
 
             running_loss += loss.item()
@@ -64,11 +64,11 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_lin_CL_1.6", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_try2", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_lin_CL_1.5", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_try2", metavar='S',
                         help='Loaded model name (when resuming)')
-    parser.add_argument('--init-from', type=str, default="resume", metavar='S',
+    parser.add_argument('--init-from', type=str, default="scratch", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
     parser.add_argument('--seed', type=int, default=42, metavar='N',
                         help='Seed for random number generation')
@@ -176,11 +176,11 @@ if __name__ == '__main__':
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
+    train_ds = whCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
+    val_ds = whCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model
