@@ -1,5 +1,12 @@
 import numpy as np
 import torch
+import random
+import math
+from numpy import zeros, empty, cos, sin, any, copy
+from numpy.linalg import solve, LinAlgError
+from numpy.random import rand, randn, uniform, default_rng
+from numba import float32, float64, jit, NumbaPerformanceWarning
+import warnings
 
 class DiscreteTransferFunction(torch.nn.Module):
     def __init__(self, b, a, dt=1.0):
@@ -275,14 +282,15 @@ def perturb_matrices(A, B, C, D, percentage, device='cuda'):
     Returns:
         A_perturbed, B_perturbed, C_perturbed, D_perturbed: Perturbed matrices.
     """
+    set_seed(random.randint(1, 500))
     # Ensure percentage is a fraction
     percentage /= 100.0
 
     # Generate random perturbations
-    perturb_A = torch.randn_like(A, device=device) * percentage * A
-    perturb_B = torch.randn_like(B, device=device) * percentage * B
-    perturb_C = torch.randn_like(C, device=device) * percentage * C
-    perturb_D = torch.randn_like(D, device=device) * percentage * D
+    perturb_A = (2*torch.rand_like(A, device=device) - 1) * percentage * A
+    perturb_B = (2*torch.rand_like(B, device=device) - 1) * percentage * B
+    perturb_C = (2*torch.rand_like(C, device=device) - 1) * percentage * C
+    perturb_D = (2*torch.rand_like(D, device=device) - 1) * percentage * D
 
     # Apply perturbations
     A_perturbed = A + perturb_A
@@ -291,9 +299,19 @@ def perturb_matrices(A, B, C, D, percentage, device='cuda'):
     D_perturbed = D + perturb_D
 
     # Clip the perturbations of A between 0 and 1
-    A_perturbed = torch.clamp(A_perturbed, min=0, max=1-1e-3)
+    #A_perturbed = torch.clamp(A_perturbed, min=0, max=1-1e-3)
+
+    L_complex = torch.linalg.eigvals(A_perturbed)
+    max_eigval = torch.max(torch.abs(L_complex))
+    if max_eigval >= 1:
+        A_perturbed = A_perturbed / (max_eigval + 1.1)
 
     return A_perturbed, B_perturbed, C_perturbed, D_perturbed
+
+def perturb_parameters(param, percentage, device = 'cuda'):
+    set_seed(random.randint(1, 500))
+    perturb = (torch.rand_like(param, device=device)-0.5) * (percentage / 100.0) * param
+    return param + perturb
 
 def set_seed(seed):
     torch.manual_seed(seed)
@@ -302,3 +320,104 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def drss_matrices(states, inputs, outputs, strictly_proper=False, mag_range=(0.5, 0.97), phase_range=(0, math.pi / 2),
+               dtype=torch.float32, device="cuda:0", rng = None):
+    """
+    Generate random state-space matrices for a discrete-time linear system.
+
+    Args:
+        states: Number of states (nx).
+        inputs: Number of inputs (nu).
+        outputs: Number of outputs (ny).
+        strictly_proper: If True, the D matrix is zero.
+        mag_range: Tuple specifying the range of magnitudes for the poles.
+        phase_range: Tuple specifying the range of phases for the poles.
+        dtype: Data type of tensors.
+        device: Device to perform the computations on.
+
+    Returns:
+        A, B, C, D: State-space matrices as PyTorch tensors.
+    """
+
+    if rng is None:
+        rng = torch.Generator(device).manual_seed(int(torch.randint(1, 500, (1,), device=device).item()))
+
+    # Probability settings
+    pRepeat = 0.05  # Probability of repeating a previous root
+    pReal = 0.6  # Probability of choosing a real root
+    pBCmask = 0.8  # Probability that an element in B or C will not be masked out
+    pDmask = 0.3  # Probability that an element in D will not be masked out
+    pDzero = 0.5  # Probability that D = 0
+
+    # Validate input arguments
+    if states < 1 or states % 1:
+        raise ValueError("states must be a positive integer. states = %g." % states)
+    if inputs < 1 or inputs % 1:
+        raise ValueError("inputs must be a positive integer. inputs = %g." % inputs)
+    if outputs < 1 or outputs % 1:
+        raise ValueError("outputs must be a positive integer. outputs = %g." % outputs)
+
+    # Generate random poles for A
+    poles = torch.zeros(states, dtype=torch.cfloat, device=device)
+    i = 0
+
+    while i < states:
+        if torch.rand(1, generator=rng, device=device).item() < pRepeat and i != 0 and i != states - 1:
+            if poles[i - 1].imag == 0:
+                poles[i] = poles[i - 1]
+                i += 1
+            else:
+                poles[i:i + 2] = poles[i - 2:i]
+                i += 2
+        elif torch.rand(1, generator=rng, device=device).item() < pReal or i == states - 1:
+            poles[i] = torch.rand(1, generator=rng, device=device).uniform_(mag_range[0], mag_range[1])
+            i += 1
+        else:
+            mag = torch.rand(1, generator=rng, device=device).uniform_(mag_range[0], mag_range[1])
+            phase = torch.rand(1, generator=rng, device=device).uniform_(phase_range[0], phase_range[1])
+            poles[i] = torch.complex(mag * torch.cos(phase), mag * torch.sin(phase))
+            poles[i + 1] = torch.conj(poles[i])
+            i += 2
+
+    # Place poles in A as real blocks on the diagonal
+    A = torch.zeros((states, states), dtype=dtype, device=device)
+    i = 0
+    while i < states:
+        if poles[i].imag == 0:
+            A[i, i] = poles[i].real
+            i += 1
+        else:
+            A[i, i] = A[i + 1, i + 1] = poles[i].real
+            A[i, i + 1] = poles[i].imag
+            A[i + 1, i] = -poles[i].imag
+            i += 2
+
+    # Apply a random transformation to make A non-block-diagonal
+    while True:
+        T = torch.randn((states, states), dtype=dtype, device=device)
+        try:
+            A = torch.linalg.solve(T, A) @ T
+            break
+        except RuntimeError:  # Catch singular matrix errors
+            pass
+
+    # Generate random B, C, D matrices
+    B = torch.randn((states, inputs), dtype=dtype, device=device)
+    C = torch.randn((outputs, states), dtype=dtype, device=device)
+    D = torch.randn((outputs, inputs), dtype=dtype, device=device)
+
+    # Apply masks to zero out some elements of B, C, D
+    Bmask = torch.rand((states, inputs), generator=rng, device=device) < pBCmask
+    Cmask = torch.rand((outputs, states), generator=rng, device=device) < pBCmask
+    if torch.rand(1, generator=rng, device=device).item() < pDzero:
+        Dmask = torch.zeros((outputs, inputs), dtype=torch.bool, device=device)
+    else:
+        Dmask = torch.rand((outputs, inputs), generator=rng, device=device) < pDmask
+
+    B *= Bmask.to(dtype=dtype)
+    C *= Cmask.to(dtype=dtype)
+    D = D * Dmask.to(dtype=dtype) if not strictly_proper else torch.zeros_like(D, device=device)
+
+    return A, B, C, D

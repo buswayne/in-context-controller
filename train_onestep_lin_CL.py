@@ -64,11 +64,11 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_lin_CL_1.6", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_gen_lin_2.1", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_lin_CL_1.5", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_gen_lin_2", metavar='S',
                         help='Loaded model name (when resuming)')
-    parser.add_argument('--init-from', type=str, default="resume", metavar='S',
+    parser.add_argument('--init-from', type=str, default="pretrained", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
     parser.add_argument('--seed', type=int, default=42, metavar='N',
                         help='Seed for random number generation')
@@ -176,11 +176,11 @@ if __name__ == '__main__':
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
+    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 50)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
+    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage = 50)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model
@@ -210,6 +210,7 @@ if __name__ == '__main__':
 
     # Optimizer
     optimizer = model.configure_optimizers(cfg.weight_decay, cfg.lr, (cfg.beta1, cfg.beta2), device_type)
+
     if cfg.init_from == "resume":
         optimizer.load_state_dict(checkpoint['optimizer'])
 
@@ -221,7 +222,8 @@ if __name__ == '__main__':
     LOSS_VAL = []
     best_val_loss = float('inf')
 
-    if cfg.init_from == "scratch" or cfg.init_from == "pretrained":
+    if cfg.init_from == ("scrat"
+                         "ch") or cfg.init_from == "pretrained":
         iter_num = 0
         best_val_loss = np.inf
     elif cfg.init_from == "resume":
@@ -261,8 +263,21 @@ if __name__ == '__main__':
             }
             torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
 
+        if ( epoch > 0 ) and ( epoch % 10 == 0):
+            checkpoint = {
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'model_args': model_args,
+                'iter_num': epoch,
+                'train_time': time.time() - time_start,
+                'LOSS': LOSS_ITR,
+                'LOSS_VAL': LOSS_VAL,
+                'best_val_loss': best_val_loss,
+                'cfg': cfg,
+            }
+            torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
+
         print(f"Epoch [{epoch + 1}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     print("Training complete. Best model saved as 'best_model.pth'.")
-
 
