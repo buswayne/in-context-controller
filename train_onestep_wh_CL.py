@@ -64,9 +64,9 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_try3.10", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_per_0.2", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_try3.9", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_per_0.1", metavar='S',
                         help='Loaded model name (when resuming)')
     parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
@@ -176,11 +176,11 @@ if __name__ == '__main__':
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = whCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 0)
+    train_ds = whCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 30)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = whCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 0)
+    val_ds = whCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 30)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model

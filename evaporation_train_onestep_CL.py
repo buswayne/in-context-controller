@@ -5,10 +5,10 @@ import numpy as np
 import math
 import gc
 from functools import partial
-from dataset_CL import LinearCLDataset
+from evaporation_dataset_CL import EvaporationDataset
 from torch.utils.data import DataLoader
 from transformer_onestep import GPTConfig, GPT, warmup_cosine_lr
-from transformer_onestep_CL import GPTClosedLoop
+from evaporation_transformer_CL import GPTClosedLoop
 import tqdm
 import argparse
 import warnings
@@ -24,6 +24,7 @@ warnings.filterwarnings("default")
 
 
 def train(model, dataloader, criterion, optimizer, device):
+    torch.autograd.set_detect_anomaly(True)
     model.train()
     running_loss = 0.0
     for batch in dataloader:
@@ -32,6 +33,7 @@ def train(model, dataloader, criterion, optimizer, device):
 
         optimizer.zero_grad()
         batch_y = model(batch_G, batch_r)
+
         loss = criterion(batch_y, batch_y_d)
         loss.backward()
         optimizer.step()
@@ -64,11 +66,11 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_gen_lin_2.6", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_evaporation_0", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_gen_lin_2.5", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_evaporation_0", metavar='S',
                         help='Loaded model name (when resuming)')
-    parser.add_argument('--init-from', type=str, default="resume", metavar='S',
+    parser.add_argument('--init-from', type=str, default="scratch", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
     parser.add_argument('--seed', type=int, default=42, metavar='N',
                         help='Seed for random number generation')
@@ -78,9 +80,9 @@ if __name__ == '__main__':
     # Dataset
     parser.add_argument('--nx', type=int, default=2, metavar='N',
                         help='model order (default: 5)')
-    parser.add_argument('--nu', type=int, default=1, metavar='N',
+    parser.add_argument('--nu', type=int, default=2, metavar='N',
                         help='model order (default: 5)')
-    parser.add_argument('--ny', type=int, default=1, metavar='N',
+    parser.add_argument('--ny', type=int, default=2, metavar='N',
                         help='model order (default: 5)')
     parser.add_argument('--seq-len', type=int, default=500, metavar='N',
                         help='sequence length (default: 600)')
@@ -176,11 +178,11 @@ if __name__ == '__main__':
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 50)
+    train_ds = EvaporationDataset(seq_len=cfg.seq_len, ts=1)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage = 50)
+    val_ds = EvaporationDataset(seq_len=cfg.seq_len, ts=1)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model
@@ -235,15 +237,16 @@ if __name__ == '__main__':
     time_start = time.time()
 
     for epoch in range(cfg.max_iters):
-
-        if cfg.decay_lr:
-            lr_iter = get_lr(epoch)
-        else:
-            lr_iter = cfg.lr
-        optimizer.param_groups[0]['lr'] = lr_iter
-
+        ## I COMMENTED THIS PART BECAUSE THERE WAS A PROBLEM WITH LR : IT WAS STUCK TO 0
+        #if cfg.decay_lr:
+        #    lr_iter = get_lr(epoch)
+        #else:
+        #    lr_iter = cfg.lr
+        #optimizer.param_groups[0]['lr'] = lr_iter
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
+        scheduler.step()
 
         LOSS_ITR.append(train_loss)
         LOSS_VAL.append(val_loss)
@@ -263,7 +266,7 @@ if __name__ == '__main__':
             }
             torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
 
-        if ( epoch > 0 ) and ( epoch % 200 == 0):
+        if ( epoch > 0 ) and ( epoch % 100 == 0):
             checkpoint = {
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
@@ -280,4 +283,3 @@ if __name__ == '__main__':
         print(f"Epoch [{epoch + 1}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     print("Training complete. Best model saved as 'best_model.pth'.")
-

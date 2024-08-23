@@ -58,7 +58,6 @@ class LinearCLDataset(Dataset):
 
         # Desired response
         y_d = forced_response(*self.M, self.r)
-
         return G, self.r, y_d
 
 
@@ -125,7 +124,6 @@ class whCLDataset(Dataset):
         min_duration = 0.5  # Minimum duration for each step in seconds
         max_duration = 2  # Maximum duration for each step in seconds
         self.r = steps_sequence(self.T, self.ts, min_val, max_val, min_duration, max_duration, self.device)
-
         # Desired response
         y_d = forced_response(*self.M, self.r)
 
@@ -141,7 +139,8 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=batch_size)
     batch_G, batch_r, batch_y_d = next(iter(dataloader))
 
-
+    print(batch_r.shape)
+    print(batch_y_d.shape)
     ts = 1e-2
     T = batch_r.shape[1] * ts  # ts*self.seq_len# * 2
     t = np.arange(0, T, ts)

@@ -310,7 +310,7 @@ def perturb_matrices(A, B, C, D, percentage, device='cuda'):
 
 def perturb_parameters(param, percentage, device = 'cuda'):
     set_seed(random.randint(1, 500))
-    perturb = (torch.rand_like(param, device=device)-0.5) * (percentage / 100.0) * param
+    perturb = (2*torch.rand_like(param, device=device)-1) * (percentage / 100.0) * param
     return param + perturb
 
 def set_seed(seed):
