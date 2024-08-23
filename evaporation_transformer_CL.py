@@ -27,8 +27,15 @@ class GPTClosedLoop(nn.Module):
 
         # Initial conditions
         U[:, 0, :] = 0
-        y_i = torch.zeros((b, self.ny), device=device, dtype=torch.float32)
-        x_i = torch.zeros((b, self.nx), device=device, dtype=torch.float32)
+        #y_i = torch.zeros((b, self.ny), device=device, dtype=torch.float32)
+        #x_i = torch.zeros((b, self.nx), device=device, dtype=torch.float32)
+        # Create a tensor with the desired initial values [25, 49]
+        initial_values = torch.tensor([25, 49.743], device=device, dtype=torch.float32)
+        # Define perturbation range (±20%)
+        perturbation_factor = 0.20
+        random_perturbations = (torch.rand(b, 2, device=device) * 2 - 1 ) * perturbation_factor
+        x_i = initial_values.unsqueeze(0).repeat(b, 1) * (1 + random_perturbations)
+        y_i = x_i.clone()
         #dovrei mettere uno stato iniziale (e anche uscita ) diverso da 0
 
         for i in range(t):

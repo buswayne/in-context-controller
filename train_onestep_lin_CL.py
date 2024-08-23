@@ -236,12 +236,12 @@ if __name__ == '__main__':
 
     for epoch in range(cfg.max_iters):
 
-        if cfg.decay_lr:
-            lr_iter = get_lr(epoch)
-        else:
-            lr_iter = cfg.lr
-        optimizer.param_groups[0]['lr'] = lr_iter
-
+        #if cfg.decay_lr:
+        #    lr_iter = get_lr(epoch)
+        #else:
+        #    lr_iter = cfg.lr
+        #optimizer.param_groups[0]['lr'] = lr_iter
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
 

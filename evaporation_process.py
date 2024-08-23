@@ -1,8 +1,10 @@
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
 
 def problem_data(perturbation, device="cuda:0"):
     """ Problem data, numeric constants,... adapted to work on GPU with torch """
-    perturbation = torch.tensor(perturbation, dtype=torch.float32, device=device)
+    perturbation = torch.tensor(perturbation/100, dtype=torch.float32, device=device)
     data = {}
 
     data['a'] = torch.tensor(0.5616, dtype=torch.float32, device=device) * (
@@ -100,8 +102,7 @@ def dynamics(x, u, intermediate_data):
     P2_dot = (F4 - F5) / C
 
     # Return state derivatives as a tensor
-    xdot = torch.stack([X2_dot, P2_dot])
-
+    xdot = torch.tensor([X2_dot, P2_dot], device=x.device)
     return xdot
 
 
@@ -110,3 +111,134 @@ def vars(device):
     x = torch.tensor([25.0, 49.743], dtype=torch.float32, device=device)  # Initial state, modify as needed
     u = torch.tensor([0.0, 0.0], dtype=torch.float32, device=device)  # Initial control input, modify as needed
     return x, u
+
+
+def simulate_evaporation_process(u, data_perturbation,initial_state_perturbation, device="cuda:0", save_params=False, noisy = False):
+    Ts = 1  # Time step
+    data = problem_data(data_perturbation, device)
+    x_0, u_0 = vars(device)
+
+    # Initialize tensors to store the trajectory
+    num_steps = u.size(0)
+    x_n = torch.zeros((num_steps, 2), device=device)
+    x = torch.zeros((num_steps, 2), device=device)
+    y = torch.zeros((num_steps, 2), device=device)
+
+    # Perturb the initial state
+    x_0 = x_0 * (1. + (initial_state_perturbation/100) * (torch.rand(2, device=device) * 2 - 1.))
+    s = x_0
+    s_noisy = s.clone()  # Ensure to use clone
+
+
+    if noisy :
+        for i in range(num_steps):
+            a = u[i, :]  # action
+            # Store the nominal value
+            x_n[i, :] = s
+            # Calculate intermediate variables
+            intermediate_data = intermediate_vars(s, a, data)
+            # Dynamics equation
+            x_dot = dynamics(s, a, intermediate_data)
+            # Integrate dynamics using forward Euler integration
+            s_next = s + Ts * x_dot
+            # Store the noisy state and measure with additional noise
+            x[i, :] = s_noisy
+            y[i, :] = s_noisy + (torch.tensor([2.0, 2.0], device=device) * torch.randn(2, device=device))  # Measurement noise
+            # Calculate intermediate variables for the noisy state
+            intermediate_data = intermediate_vars(s_noisy, a, data)
+            # Dynamics equation with noise
+            x_dot = dynamics(s_noisy, a, intermediate_data)
+            s_next_noisy = s_noisy + Ts * x_dot + (torch.tensor([0.5, 0.5], device=device) * torch.randn(2, device=device))
+            # Update state
+            s = s_next
+            s_noisy = s_next_noisy
+    else :
+        for i in range(num_steps):
+            a = u[i, :]  # action
+            x_n[i, :] = s
+            x[i,:]=s
+            # Calculate intermediate variables
+            intermediate_data = intermediate_vars(s, a, data)
+            # Dynamics equation
+            x_dot = dynamics(s, a, intermediate_data)
+            # Integrate dynamics using forward Euler integration
+            y[i, :] = s
+            s_next = s + Ts * x_dot
+            s = s_next
+
+
+
+    if save_params:
+        return x_n, x, y, intermediate_data
+    else:
+        return x_n, x, y
+
+def generate_prbs(num_steps, perturbation_range=20):
+    """Generate a Perturbed Random Binary Signal (PRBS)"""
+    prbs = torch.randint(0, 2, (num_steps, 2), dtype=torch.float32,  device="cuda:0") * 2 - 1  # Randomly choose -1 or 1
+    prbs *= perturbation_range  # Scale to ±20
+    return prbs
+
+
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+
+def main():
+    # Set up parameters
+    num_steps = 500  # Number of time steps per simulation
+    num_simulations = 10 # Number of simulations to run
+
+    # Generate inputs for simulation
+    constant_u = torch.tensor([191.713, 215.888], device="cuda:0")
+
+    # Perturbation factor for initial conditions
+    data_pert_perc = 20
+    state_pert = 20
+
+    # Initialize arrays to store results of each simulation
+    x_n_all = np.zeros((num_simulations, num_steps, 2))
+    x_all = np.zeros((num_simulations, num_steps, 2))
+    y_all = np.zeros((num_simulations, num_steps, 2))
+
+    for sim_id in range(num_simulations):
+        # Simulate the system trajectory using the model
+        prbs_signal = generate_prbs(num_steps)
+
+        # use constant input u or perturbed with PRBS
+        #u_forced = constant_u + prbs_signal  # Perturb the steady-state input
+        #u_forced = constant_u + torch.zeros_like(prbs_signal, dtype=torch.float32, device="cuda:0")
+        u_forced = torch.zeros_like(prbs_signal, dtype=torch.float32,  device="cuda:0")
+
+        x_n, x, y = simulate_evaporation_process(u_forced, data_pert, state_pert, device="cuda:0", noisy = False)
+
+        # Store the results in the preallocated arrays
+        x_n_all[sim_id] = x_n.cpu().numpy()
+        x_all[sim_id] = x.cpu().numpy()
+        y_all[sim_id] = y.cpu().numpy()
+
+
+    # Plot the results for all simulations
+    plt.figure(figsize=(10, 5))
+    # Plot the first measurement for all simulations
+    plt.subplot(211)
+    plt.plot(y_all[:, :, 0].T, color='blue', alpha=0.5)  # Plotting the first measurement across all simulations
+    plt.xlabel(r'$t \ [s]$')
+    #plt.ylabel(r'$x_1^0$')
+    plt.ylabel(r'$y_1$')
+    plt.ylim([-10,40])
+    plt.grid()
+    # Plot the second measurement for all simulations
+    plt.subplot(212)
+    plt.plot(y_all[:, :, 1].T, color='blue', alpha=0.5)  # Plotting the second measurement across all simulations
+    plt.xlabel(r'$t \ [s]$')
+    #plt.ylabel(r'$x_2^0$')
+    plt.ylabel(r'$y_2$')
+    plt.ylim([30, 120])
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    main()
+

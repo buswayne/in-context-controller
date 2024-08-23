@@ -64,9 +64,9 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_per_0.2", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_per_0.1", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_per_0.1", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_per_0", metavar='S',
                         help='Loaded model name (when resuming)')
     parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
@@ -239,14 +239,14 @@ if __name__ == '__main__':
         else:
             lr_iter = cfg.lr
         optimizer.param_groups[0]['lr'] = lr_iter
-
+        #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
 
         LOSS_ITR.append(train_loss)
         LOSS_VAL.append(val_loss)
 
-        if val_loss < best_val_loss:
+        if val_loss < best_val_loss :
             best_val_loss = val_loss
             checkpoint = {
                 'model': model.state_dict(),
@@ -260,7 +260,7 @@ if __name__ == '__main__':
                 'cfg': cfg,
             }
             torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
-
+        """
         if ( epoch > 0 ) and ( epoch % 300 == 0):
             checkpoint = {
                 'model': model.state_dict(),
@@ -274,7 +274,7 @@ if __name__ == '__main__':
                 'cfg': cfg,
             }
             torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
-
+        """
 
         print(f"Epoch [{epoch + 1}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
 

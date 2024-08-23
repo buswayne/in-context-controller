@@ -10,8 +10,8 @@ from models import SimpleModel
 from evaporation_process import problem_data
 
 class EvaporationDataset(Dataset):
-    def __init__(self, seq_len, nx=2, nu=1, ny=2, seed=42, ts=1, perturb_percentage = 0, batch_size = 1):
-        self.perturb_percentage = perturb_percentage
+    def __init__(self, seq_len, nx=2, nu=1, ny=2, seed=42, ts=1, data_perturb_percentage = 0, batch_size = 1):
+        self.data_perturb_percentage = data_perturb_percentage
         self.batch_size = batch_size
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.seq_len = seq_len
@@ -24,7 +24,7 @@ class EvaporationDataset(Dataset):
 
         set_seed(42)
         # define nominal model
-        self.prob_data = problem_data(self.perturb_percentage)
+        self.prob_data = problem_data(self.data_perturb_percentage)
 
         # define model reference (?) NEEDS WORKING ON
         #tau = 1
@@ -51,14 +51,14 @@ class EvaporationDataset(Dataset):
 
         #THIS PART NEEDS WORKING ON, NOT FINISHED
         #y_d = self.r
-        return data, self.r, y_d
+        return data, self.r, y_d,
 
 
 if __name__ == "__main__":
     # Parameters
     batch_size = 1
     # Create dataset and dataloader
-    dataset = EvaporationDataset(seq_len=500, ts=1, seed=42, perturb_percentage=0)
+    dataset = EvaporationDataset(seq_len=500, ts=1, seed=42, data_perturb_percentage=0)
     dataloader = DataLoader(dataset, batch_size=batch_size)
     batch_G, batch_r,batch_y_d = next(iter(dataloader))
     print(batch_y_d.shape)
