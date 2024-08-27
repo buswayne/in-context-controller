@@ -64,9 +64,9 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_gen_lin_2.6", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_gen_lin_3.4", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_gen_lin_2.5", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_gen_lin_3.3", metavar='S',
                         help='Loaded model name (when resuming)')
     parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
@@ -176,11 +176,11 @@ if __name__ == '__main__':
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 50)
+    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage= 0)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage = 50)
+    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, perturb_percentage = 0)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model
@@ -236,14 +236,18 @@ if __name__ == '__main__':
 
     for epoch in range(cfg.max_iters):
 
-        #if cfg.decay_lr:
-        #    lr_iter = get_lr(epoch)
-        #else:
-        #    lr_iter = cfg.lr
-        #optimizer.param_groups[0]['lr'] = lr_iter
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
+        if cfg.decay_lr:
+            lr_iter = get_lr(epoch)
+        else:
+            lr_iter = cfg.lr
+        optimizer.param_groups[0]['lr'] = lr_iter
+        #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
+
+        if math.isnan(train_loss) or math.isnan(val_loss):
+            print(f"NaN detected! Stopping training at epoch {epoch}.")
+            break
 
         LOSS_ITR.append(train_loss)
         LOSS_VAL.append(val_loss)
@@ -280,4 +284,7 @@ if __name__ == '__main__':
         print(f"Epoch [{epoch + 1}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     print("Training complete. Best model saved as 'best_model.pth'.")
+
+print("Training stopped due to NaN loss. Best model saved as 'best_model.pth'.")
+
 

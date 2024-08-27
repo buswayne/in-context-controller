@@ -36,7 +36,7 @@ class GPTClosedLoop(nn.Module):
         random_perturbations = (torch.rand(b, 2, device=device) * 2 - 1 ) * perturbation_factor
         x_i = initial_values.unsqueeze(0).repeat(b, 1) * (1 + random_perturbations)
         y_i = x_i.clone()
-        #dovrei mettere uno stato iniziale (e anche uscita ) diverso da 0
+
 
         for i in range(t):
             # Print current time instant

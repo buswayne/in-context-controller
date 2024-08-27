@@ -47,8 +47,8 @@ class LinearCLDataset(Dataset):
     def __getitem__(self, index):
         # Generate data on-the-fly
         #G = perturb_matrices(*self.G_0, percentage=self.perturb_percentage, device=self.device)
-        #G = drss_matrices( 2,1,1)
-        G = drss(self.nx, self.nu, self.ny, device=self.device, stricly_proper=True)
+        G = drss_matrices( 2,1,1)
+        #G = drss(self.nx, self.nu, self.ny, device=self.device, stricly_proper=True)
         # define reference
         min_val = -10  # Minimum step value
         max_val = 10  # Maximum step value

@@ -64,9 +64,9 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_per_0.1", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_wh_per_0.2", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_per_0", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_wh_per_0.1", metavar='S',
                         help='Loaded model name (when resuming)')
     parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
@@ -243,6 +243,10 @@ if __name__ == '__main__':
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
 
+        if math.isnan(train_loss) or math.isnan(val_loss):
+            print(f"NaN detected! Stopping training at epoch {epoch}.")
+            break
+
         LOSS_ITR.append(train_loss)
         LOSS_VAL.append(val_loss)
 
@@ -279,5 +283,7 @@ if __name__ == '__main__':
         print(f"Epoch [{epoch + 1}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
 
     print("Training complete. Best model saved as 'best_model.pth'.")
+
+print("Training stopped due to NaN loss. Best model saved as 'best_model.pth'.")
 
 
