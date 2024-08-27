@@ -210,7 +210,7 @@ def main():
         #u_forced = constant_u + torch.zeros_like(prbs_signal, dtype=torch.float32, device="cuda:0")
         u_forced = torch.zeros_like(prbs_signal, dtype=torch.float32,  device="cuda:0")
 
-        x_n, x, y = simulate_evaporation_process(u_forced, data_pert, state_pert, device="cuda:0", noisy = False)
+        x_n, x, y = simulate_evaporation_process(u_forced, data_pert_perc, state_pert, device="cuda:0", noisy = False)
 
         # Store the results in the preallocated arrays
         x_n_all[sim_id] = x_n.cpu().numpy()

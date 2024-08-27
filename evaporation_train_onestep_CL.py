@@ -35,6 +35,13 @@ def train(model, dataloader, criterion, optimizer, device):
         batch_y = model(batch_G, batch_r)
 
         loss = criterion(batch_y, batch_y_d)
+        #print("batch_y requires_grad:", batch_y.requires_grad)
+        #print("batch_y grad_fn:", batch_y.grad_fn)
+        #print("batch_y_d requires_grad:", batch_y_d.requires_grad)
+        #print("batch_y_d grad_fn:", batch_y_d.grad_fn)
+        #print("loss requires_grad:", loss.requires_grad)
+        #print("loss grad_fn:", loss.grad_fn)
+
         loss.backward()
         optimizer.step()
 
@@ -49,6 +56,7 @@ def validate(model, dataloader, criterion, device):
     with torch.no_grad():
         for batch in dataloader:
             batch_G, batch_r, batch_y_d = batch
+
             batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
             batch_y = model(batch_G, batch_r)
@@ -236,17 +244,18 @@ if __name__ == '__main__':
                      warmup_iters=cfg.warmup_iters, lr_decay_iters=cfg.lr_decay_iters)
     time_start = time.time()
 
+
     for epoch in range(cfg.max_iters):
         ## I COMMENTED THIS PART BECAUSE THERE WAS A PROBLEM WITH LR : IT WAS STUCK TO 0
-        #if cfg.decay_lr:
-        #    lr_iter = get_lr(epoch)
-        #else:
-        #    lr_iter = cfg.lr
-        #optimizer.param_groups[0]['lr'] = lr_iter
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
+        if cfg.decay_lr:
+            lr_iter = get_lr(epoch)
+        else:
+            lr_iter = cfg.lr
+        optimizer.param_groups[0]['lr'] = lr_iter
+        #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
-        scheduler.step()
+        #scheduler.step()
 
         LOSS_ITR.append(train_loss)
         LOSS_VAL.append(val_loss)

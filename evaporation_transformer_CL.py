@@ -30,12 +30,12 @@ class GPTClosedLoop(nn.Module):
         #y_i = torch.zeros((b, self.ny), device=device, dtype=torch.float32)
         #x_i = torch.zeros((b, self.nx), device=device, dtype=torch.float32)
         # Create a tensor with the desired initial values [25, 49]
-        initial_values = torch.tensor([25, 49.743], device=device, dtype=torch.float32)
+        initial_values = torch.tensor([25, 49.743], device=device, dtype=torch.float32, requires_grad=True)
         # Define perturbation range (±20%)
         perturbation_factor = 0.20
         random_perturbations = (torch.rand(b, 2, device=device) * 2 - 1 ) * perturbation_factor
         x_i = initial_values.unsqueeze(0).repeat(b, 1) * (1 + random_perturbations)
-        y_i = x_i.clone()
+        y_i = x_i
 
 
         for i in range(t):
@@ -67,8 +67,8 @@ class GPTClosedLoop(nn.Module):
 
                 #print("s_next shape:", s_next.shape)
                 #print("y_i shape:", y_i[k].shape)
-                y_i = y_i.clone()
-                x_i = x_i.clone()
+                #y_i = y_i.clone()
+                #x_i = x_i.clone()
                 y_i[k] = s_next
                 x_i[k] = s_next
 
