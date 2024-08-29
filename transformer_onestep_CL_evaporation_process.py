@@ -1,8 +1,3 @@
-"""
-Implementation of the Transformer models for dynamical systems. Derived from Karpathy's nanoGPT
-https://github.com/karpathy/nanoGPT/
-"""
-
 import math
 import inspect
 from dataclasses import dataclass
@@ -12,34 +7,39 @@ import torch.nn as nn
 from torch.nn import functional as F
 from transformer_onestep import GPT, GPTConfig
 from control_torch import forced_response
+from evaporation_process import dynamics #, intermediate_vars
 
 class GPTClosedLoop(nn.Module):
     def __init__(self, gptconf):
         super().__init__()
         self.gpt_model = GPT(gptconf)
         self.nx = gptconf.n_x
+        self.ny = gptconf.n_y
 
-    def forward(self, G, r):
+    def forward(self, data, r):
 
+        Ts = 1
         device = r.device
-        b, t, nr = r.size()
+        b, t, nr = r.size() # 1,500,2
 
         E = torch.empty_like(r, device=device, dtype=torch.float32)
         U = torch.empty((b, t+1, nr), device=device, dtype=torch.float32)
         Y = torch.empty_like(r, device=device, dtype=torch.float32)
 
         # Initial conditions
-        U[:, 0, 0] = 0
-        y_i = torch.zeros((b, 1), device=device, dtype=torch.float32)
-        x_i = torch.zeros((b, self.nx), device=device, dtype=torch.float32)
+        U[:, 0, :] = 0
+        # y_i = torch.zeros((b, self.ny), device=device, dtype=torch.float32)
+        #x_i = torch.zeros((b, self.nx), device=device, dtype=torch.float32)
+        # Create a tensor with the desired initial values [25, 49]
+        y_i = torch.tensor([25, 49.743], device=device, dtype=torch.float32).unsqueeze(0).repeat(b, 1)
+        x_i = y_i.clone()
 
         for i in range(t):
-            # Print current time instant
+
             # print('time instant:', i)
 
             # Compute error
             e_i = r[:, i, :] - y_i
-
             Y[:, i, :] = y_i
             E[:, i, :] = e_i
 
@@ -50,8 +50,13 @@ class GPTClosedLoop(nn.Module):
 
             # Simulate system response
             for k in range(b):
-                y, x_i[k] = forced_response(G[0][k],G[1][k],G[2][k],G[3][k], U[0, i:i + 2, :], return_x=True, x0=x_i[k])
-                y_i[k] = y[-1]
+
+                x_dot = dynamics(x_i[k], U[k,i+1, :], *data)
+
+                # Integrate dynamics using forward Euler integration
+                y_i[k] = x_i[k] + Ts * x_dot
+                x_i[k] = y_i[k].clone()
+
 
         return Y
 

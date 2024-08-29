@@ -64,11 +64,11 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_lin_CL", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_lin_CL_v5", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_lin_CL", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_lin_CL_v4", metavar='S',
                         help='Loaded model name (when resuming)')
-    parser.add_argument('--init-from', type=str, default="resume", metavar='S',
+    parser.add_argument('--init-from', type=str, default="pretrained", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
     parser.add_argument('--seed', type=int, default=42, metavar='N',
                         help='Seed for random number generation')
@@ -176,11 +176,11 @@ if __name__ == '__main__':
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
+    train_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, random_start=False)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42)
+    val_ds = LinearCLDataset(seq_len=cfg.seq_len, ts=0.01, seed=42, random_start=False)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model
@@ -217,24 +217,26 @@ if __name__ == '__main__':
     # Criterion
     criterion = torch.nn.MSELoss()
 
-    # Training and validation loop
-    LOSS_ITR = []
-    LOSS_VAL = []
-    best_val_loss = float('inf')
-
-    if cfg.init_from == ("scrat"
-                         "ch") or cfg.init_from == "pretrained":
+    if cfg.init_from == ("scratch") or cfg.init_from == "pretrained":
+        # Training and validation loop
+        LOSS_ITR = []
+        LOSS_VAL = []
         iter_num = 0
         best_val_loss = np.inf
+        train_time = 0.0
     elif cfg.init_from == "resume":
+        # Training and validation loop
+        LOSS_ITR = checkpoint['LOSS']
+        LOSS_VAL = checkpoint['LOSS_VAL']
         iter_num = checkpoint["iter_num"]
         best_val_loss = checkpoint['best_val_loss']
+        train_time = checkpoint['train_time']
 
     get_lr = partial(warmup_cosine_lr, lr=cfg.lr, min_lr=cfg.min_lr,
                      warmup_iters=cfg.warmup_iters, lr_decay_iters=cfg.lr_decay_iters)
     time_start = time.time()
 
-    for epoch in range(cfg.max_iters):
+    for epoch in range(iter_num+1, cfg.max_iters):
 
         if cfg.decay_lr:
             lr_iter = get_lr(epoch)
@@ -255,7 +257,7 @@ if __name__ == '__main__':
                 'optimizer': optimizer.state_dict(),
                 'model_args': model_args,
                 'iter_num': epoch,
-                'train_time': time.time() - time_start,
+                'train_time': time.time() - time_start + train_time,
                 'LOSS': LOSS_ITR,
                 'LOSS_VAL': LOSS_VAL,
                 'best_val_loss': best_val_loss,

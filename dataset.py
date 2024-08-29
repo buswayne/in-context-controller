@@ -4,7 +4,7 @@ import time
 from torch.utils.data import Dataset, DataLoader
 from torch.profiler import profile, record_function, ProfilerActivity
 import matplotlib.pyplot as plt
-from control_torch import drss, forced_response, tf2ss, c2d, perturb_matrices, set_seed
+from control_torch import drss, forced_response, tf2ss, c2d, perturb_matrices, set_seed, drss_matrices
 
 class LinearDataset(Dataset):
     def __init__(self, seq_len, nx=2, nu=1, ny=1, seed=42, ts=0.01, return_y=False):
@@ -21,7 +21,7 @@ class LinearDataset(Dataset):
         self.return_y = return_y
 
         # define nominal model
-        self.G_0 = drss(self.nx, self.nu, self.ny, device=self.device)
+        self.G_0 = drss_matrices(self.nx, self.nu, self.ny, strictly_proper=True, device=self.device)
 
         # define model reference
         tau = 1
@@ -32,7 +32,7 @@ class LinearDataset(Dataset):
         self.M = c2d(*M, self.ts, device=self.device)
         self.M_inv = c2d(*M_inv, self.ts, device=self.device)
 
-        self.u = 1000*torch.randn(self.seq_len, self.nu, device=self.device, dtype=torch.float32)
+        self.u = 10*torch.randn(self.seq_len, self.nu, device=self.device, dtype=torch.float32)
 
     def __len__(self):
         return 32
@@ -40,10 +40,12 @@ class LinearDataset(Dataset):
     def __getitem__(self, index):
         # Generate data on-the-fly
         G = perturb_matrices(*self.G_0, percentage=0, device=self.device)
+        # G = drss(self.nx, self.nu, self.ny, device=self.device)
 
-        # u = 1000*torch.randn(self.seq_len, self.nu, device=self.device, dtype=torch.float32)
+        u = 10*torch.randn(self.seq_len, self.nu, device=self.device, dtype=torch.float32)
         # u = torch.ones(self.seq_len, self.nu, device=device, dtype=torch.float32)
-        u = self.u
+        # u = self.u
+        # u = 100*torch.ones((self.seq_len,1), device=self.device, dtype=torch.float32)
 
         # Simulate forced response using custom GPU function
         y = forced_response(*G, u)
@@ -59,10 +61,10 @@ class LinearDataset(Dataset):
         e_v = r_v - y_L
 
         # Align to have proper signal
-        u_L = u_L[:-1] / 200
+        u_L = u_L[:-1]
         y_L = y_L[1:]
         r_v = r_v[1:]
-        e_v = e_v[1:] / 200
+        e_v = e_v[1:]
 
         if self.return_y:
             return y_L, u_L, e_v

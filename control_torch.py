@@ -1,5 +1,7 @@
 import numpy as np
+import math
 import torch
+from torch import zeros, complex, cos, sin, solve
 
 class DiscreteTransferFunction(torch.nn.Module):
     def __init__(self, b, a, dt=1.0):
@@ -29,7 +31,120 @@ class DiscreteTransferFunction(torch.nn.Module):
 
         return y * self.dt
 
-def drss(nx, nu, ny, stricly_proper=True, device="cuda:0", dtype=torch.float32):
+
+def drss_matrices(
+        states, inputs, outputs, strictly_proper=False, mag_range=(0.5, 0.97), phase_range=(0, math.pi / 2),
+        dtype=torch.float32, device='cuda'):
+    """Generate a random state space using PyTorch, running on the GPU.
+
+    This does the actual random state space generation expected from rss and
+    drss.  cdtype is 'c' for continuous systems and 'd' for discrete systems.
+
+    """
+
+    # Probability of repeating a previous root.
+    pRepeat = 0.05
+    # Probability of choosing a real root.  Note that when choosing a complex
+    # root, the conjugate gets chosen as well.  So the expected proportion of
+    # real roots is pReal / (pReal + 2 * (1 - pReal)).
+    pReal = 0.5
+    # Probability that an element in B or C will not be masked out.
+    pBCmask = 0.8
+    # Probability that an element in D will not be masked out.
+    pDmask = 0.3
+    # Probability that D = 0.
+    pDzero = 0.5
+
+    # Check for valid input arguments.
+    if states < 1 or states % 1:
+        raise ValueError("states must be a positive integer.  states = %g." % states)
+    if inputs < 1 or inputs % 1:
+        raise ValueError("inputs must be a positive integer.  inputs = %g." % inputs)
+    if outputs < 1 or outputs % 1:
+        raise ValueError("outputs must be a positive integer.  outputs = %g." % outputs)
+
+    # Create uniform distributions for magnitude and phase ranges
+    mag_dist = torch.distributions.Uniform(mag_range[0], mag_range[1])
+    phase_dist = torch.distributions.Uniform(phase_range[0], phase_range[1])
+
+    # Make some poles for A. Preallocate a complex array.
+    poles = torch.zeros(states, dtype=torch.complex128, device=device)
+    i = 0
+
+    while i < states:
+        if torch.rand(1, device=device).item() < pRepeat and i != 0 and i != states - 1:
+            # Small chance of copying poles, if we're not at the first or last element.
+            if poles[i - 1].imag == 0:
+                # Copy previous real pole.
+                poles[i] = poles[i - 1]
+                i += 1
+            else:
+                # Copy previous complex conjugate pair of poles.
+                poles[i:i + 2] = poles[i - 2:i]
+                i += 2
+        elif torch.rand(1, device=device).item() < pReal or i == states - 1:
+            # No-oscillation pole.
+            poles[i] = mag_dist.sample((1,)).item()
+            i += 1
+        else:
+            mag = mag_dist.sample((1,))
+            phase = phase_dist.sample((1,))
+
+            poles[i] = torch.complex(mag * torch.cos(phase), mag * torch.sin(phase))
+            poles[i + 1] = torch.complex(poles[i].real, -poles[i].imag)
+            i += 2
+
+    # Now put the poles in A as real blocks on the diagonal.
+    A = torch.zeros((states, states), dtype=dtype, device=device)
+    i = 0
+    while i < states:
+        if poles[i].imag == 0:
+            A[i, i] = poles[i].real
+            i += 1
+        else:
+            A[i, i] = A[i + 1, i + 1] = poles[i].real
+            A[i, i + 1] = poles[i].imag
+            A[i + 1, i] = -poles[i].imag
+            i += 2
+
+    # Finally, apply a transformation so that A is not block-diagonal.
+    while True:
+        T = torch.normal(0, 1, size=(states, states), device=device, dtype=A.dtype)
+        try:
+            A = torch.linalg.solve(T, A) @ T  # A = T \ A @ T
+            break
+        except RuntimeError as e:
+            print(e)
+            # In the unlikely event that T is rank-deficient, iterate again.
+            pass
+
+    # Make the remaining matrices.
+    B = torch.normal(0, 1, size=(states, inputs), device=device, dtype=dtype)
+    C = torch.normal(0, 1, size=(outputs, states), device=device, dtype=dtype)
+    D = torch.normal(0, 1, size=(outputs, inputs), device=device, dtype=dtype)
+
+    # Make masks to zero out some of the elements.
+    while True:
+        Bmask = torch.rand((states, inputs), device=device, dtype=dtype) < pBCmask
+        if Bmask.any():  # Retry if we get all zeros.
+            break
+    while True:
+        Cmask = torch.rand((outputs, states), device=device, dtype=dtype) < pBCmask
+        if Cmask.any():  # Retry if we get all zeros.
+            break
+    if torch.rand(1, device=device, dtype=dtype).item() < pDzero:
+        Dmask = torch.zeros((outputs, inputs), device=device, dtype=dtype)
+    else:
+        Dmask = torch.rand((outputs, inputs), device=device, dtype=dtype) < pDmask
+
+    # Apply masks.
+    B = B * Bmask
+    C = C * Cmask
+    D = D * Dmask if not strictly_proper else torch.zeros(D.shape, dtype=dtype, device=device)
+
+    return A, B, C, D
+
+def drss(nx, nu, ny, strictly_proper=True, device="cuda:0", dtype=torch.float32):
     """
     Generate random state-space matrices for a discrete-time linear system.
     Args:
@@ -46,7 +161,7 @@ def drss(nx, nu, ny, stricly_proper=True, device="cuda:0", dtype=torch.float32):
     C = torch.randn(ny, nx, device=device, dtype=dtype)
     D = torch.randn(ny, nu, device=device, dtype=dtype)
 
-    if stricly_proper:
+    if strictly_proper:
         D = D * 0.0
 
     # Ensure A is stable
@@ -85,6 +200,7 @@ def forced_response(A, B, C, D, u, x0=None, return_x=False):
     for t in range(0, T):  # Start from the second sample to avoid duplicating the initial output
         y[t] = C @ x + D @ u[t]
         x = A @ x + B @ u[t]
+
 
     if return_x:
         return y, x
@@ -278,22 +394,61 @@ def perturb_matrices(A, B, C, D, percentage, device='cuda'):
     # Ensure percentage is a fraction
     percentage /= 100.0
 
-    # Generate random perturbations
-    perturb_A = torch.randn_like(A, device=device) * percentage * A
+    # # Generate random perturbations
+    # perturb_A = torch.randn_like(A, device=device) * percentage * A
+    # perturb_B = torch.randn_like(B, device=device) * percentage * B
+    # perturb_C = torch.randn_like(C, device=device) * percentage * C
+    # perturb_D = torch.randn_like(D, device=device) * percentage * D
+    #
+    # # Apply perturbations
+    # A_perturbed = A + perturb_A
+    # B_perturbed = B + perturb_B
+    # C_perturbed = C + perturb_C
+    # D_perturbed = D + perturb_D
+    #
+    # # Clip the perturbations of A between 0 and 1
+    # A_perturbed = torch.clamp(A_perturbed, min=0, max=1-1e-3)
+    #
+    # return A_perturbed, B_perturbed, C_perturbed, D_perturbed
+
+    # Move matrices to the desired device
+    A, B, C, D = A.to(device), B.to(device), C.to(device), D.to(device)
+
+    # Compute eigenvalues and eigenvectors of A
+    eigvals, eigvecs = torch.linalg.eig(A)
+
+    # Convert to real values if there are no complex numbers
+    eigvals_real = eigvals.real
+    eigvals_imag = eigvals.imag
+
+    # Perturb eigenvalues
+    perturb_real = torch.randn_like(eigvals_real, device=device) * percentage * eigvals_real
+    perturb_imag = torch.randn_like(eigvals_imag, device=device) * percentage * eigvals_imag
+
+    eigvals_real_perturbed = eigvals_real + perturb_real
+    eigvals_imag_perturbed = eigvals_imag + perturb_imag
+
+    # Combine perturbed eigenvalues into a complex tensor
+    eigvals_perturbed = torch.complex(eigvals_real_perturbed, eigvals_imag_perturbed)
+
+    # Ensure eigenvalues remain inside the unit circle
+    for i in range(len(eigvals_perturbed)):
+        if eigvals_perturbed[i].abs() >= 1:
+            eigvals_perturbed[i] = eigvals_perturbed[i] / (eigvals_perturbed[i].abs() + 1e-3)
+
+    # Reconstruct A_perturbed from the perturbed eigenvalues and original eigenvectors
+    A_perturbed = eigvecs @ torch.diag(eigvals_perturbed) @ torch.linalg.inv(eigvecs)
+
+    # Perturb B, C, D matrices normally
     perturb_B = torch.randn_like(B, device=device) * percentage * B
     perturb_C = torch.randn_like(C, device=device) * percentage * C
     perturb_D = torch.randn_like(D, device=device) * percentage * D
 
-    # Apply perturbations
-    A_perturbed = A + perturb_A
     B_perturbed = B + perturb_B
     C_perturbed = C + perturb_C
     D_perturbed = D + perturb_D
 
-    # Clip the perturbations of A between 0 and 1
-    A_perturbed = torch.clamp(A_perturbed, min=0, max=1-1e-3)
-
-    return A_perturbed, B_perturbed, C_perturbed, D_perturbed
+    return A_perturbed.real, B_perturbed, C_perturbed, D_perturbed
 
 def set_seed(seed):
     torch.manual_seed(seed)
