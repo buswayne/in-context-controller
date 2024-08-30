@@ -86,7 +86,7 @@ if __name__ == '__main__':
                         help='Saved model name')
     parser.add_argument('--in-file', type=str, default="ckpt_onestep_evaporation_v1", metavar='S',
                         help='Loaded model name (when resuming)')
-    parser.add_argument('--init-from', type=str, default="scratch", metavar='S',
+    parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
     parser.add_argument('--seed', type=int, default=42, metavar='N',
                         help='Seed for random number generation')
@@ -266,7 +266,7 @@ if __name__ == '__main__':
             lr_iter = get_lr(epoch)
         else:
             lr_iter = cfg.lr
-        optimizer.param_groups[0]['lr'] = lr_iter
+        optimizer.param_groups[0]['lr'] = 1e-3#lr_iter
         #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)

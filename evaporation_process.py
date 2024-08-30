@@ -90,7 +90,6 @@ def dynamics(x, u, a, b, c, d, e, f, g, h, M, C, UA2, Cp, lam, lams, F1, X1, F3,
     X2_dot = (F1 * X1 - F2 * x[0].clone()) / M
     P2_dot = (F4 - F5) / C
 
-    print(P2_dot)
     # # Return state derivatives as a tensor
     xdot = torch.cat((X2_dot, P2_dot), dim=0).to(x.device)
     return xdot
