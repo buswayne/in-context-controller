@@ -16,7 +16,7 @@ class GPTClosedLoop(nn.Module):
         self.nx = gptconf.n_x
         self.ny = gptconf.n_y
 
-    def forward(self, data, r):
+    def forward(self, data, r, y_d):
 
         Ts = 1
         device = r.device
@@ -27,11 +27,11 @@ class GPTClosedLoop(nn.Module):
         Y = torch.empty_like(r, device=device, dtype=torch.float32)
 
         # Initial conditions
-        U[:, 0, :] = 0
+        U[:, 0, :] = torch.tensor([191.713, 215.888], device=device, dtype=torch.float32).unsqueeze(0).repeat(b, 1)
         # y_i = torch.zeros((b, self.ny), device=device, dtype=torch.float32)
         #x_i = torch.zeros((b, self.nx), device=device, dtype=torch.float32)
         # Create a tensor with the desired initial values [25, 49]
-        y_i = torch.tensor([25, 49.743], device=device, dtype=torch.float32).unsqueeze(0).repeat(b, 1)
+        y_i = y_d[:,0,:] # y(0) equal to yd(0)
         x_i = y_i.clone()
 
         for i in range(t):
@@ -56,7 +56,6 @@ class GPTClosedLoop(nn.Module):
                 # Integrate dynamics using forward Euler integration
                 y_i[k] = x_i[k] + Ts * x_dot
                 x_i[k] = y_i[k].clone()
-
 
         return Y
 

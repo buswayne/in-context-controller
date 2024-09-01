@@ -201,7 +201,6 @@ def forced_response(A, B, C, D, u, x0=None, return_x=False):
         y[t] = C @ x + D @ u[t]
         x = A @ x + B @ u[t]
 
-
     if return_x:
         return y, x
     else:

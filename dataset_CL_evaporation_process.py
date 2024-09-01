@@ -26,6 +26,13 @@ class EvaporationDataset(Dataset):
         # define nominal model
         self.prob_data = problem_data(self.data_perturb_percentage)
 
+        # define model reference
+        tau = 5
+        M_num = torch.tensor([0.01, 1], device=self.device, dtype=torch.float32)  # Numerator coefficients
+        M_den = torch.tensor([tau / 4, 1], device=self.device, dtype=torch.float32)  # Denominator coefficients
+        M = tf2ss(M_num, M_den, device=self.device)  # M
+        self.M = c2d(*M, self.ts, device=self.device)
+
         # define reference
         self.r = torch.zeros((self.seq_len, 2), device=self.device, dtype=torch.float32)
         self.r[:,0] = steps_sequence(self.T, self.ts, 20, 25, 20, 50).T
@@ -42,8 +49,8 @@ class EvaporationDataset(Dataset):
         x2 = torch.tensor([49.743], device=self.device, dtype=torch.float32)
 
         # Desired response
-        y_d1 = self.r[:,0].reshape(-1,1)
-        y_d2 = self.r[:,1].reshape(-1,1)
+        y_d1 = forced_response(*self.M, self.r[:,0].reshape(-1,1), x0=x1)#self.r[:,0].reshape(-1,1)
+        y_d2 = forced_response(*self.M, self.r[:,1].reshape(-1,1), x0=x2)#self.r[:,1].reshape(-1,1)
         y_d = torch.cat((y_d1, y_d2), dim=1).to(self.device)
 
         #THIS PART NEEDS WORKING ON, NOT FINISHED
@@ -69,11 +76,10 @@ if __name__ == "__main__":
     plt.figure(figsize=(10, 6))
     #print(batch_y_d[0, 0:40, 1].cpu().numpy())
     for i in range(batch_size):
+
+
         batch_data, batch_r, batch_y_d = next(iter(dataloader))
 
-        print(batch_r.shape)
-
-        print(batch_data)
         plt.plot(t, batch_r[i,:, 0].cpu().numpy(), c='tab:blue', alpha=0.5, label='$r_1$' if i == 0 else "")
         plt.plot(t, batch_r[i,:, 1].cpu().numpy(), c='tab:red', alpha=0.5, label='$r_2$' if i == 0 else "")
         plt.plot(t, batch_y_d[i, :, 0].cpu().numpy(), c='tab:blue', alpha=0.7, label='$y_{d}1$' if i == 0 else "")

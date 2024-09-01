@@ -32,7 +32,7 @@ def train(model, dataloader, criterion, optimizer, device):
         batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
         optimizer.zero_grad()
-        batch_y = model(batch_G, batch_r)
+        batch_y = model(batch_G, batch_r, batch_y_d)
 
         loss = criterion(batch_y, batch_y_d)
         #print("batch_y requires_grad:", batch_y.requires_grad)
@@ -67,7 +67,7 @@ def validate(model, dataloader, criterion, device):
 
             batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
-            batch_y = model(batch_G, batch_r)
+            batch_y = model(batch_G, batch_r, batch_y_d)
             loss = criterion(batch_y, batch_y_d)
 
             running_loss += loss.item()
@@ -82,9 +82,9 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_evaporation_v1", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_evaporation_v3", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_evaporation_v1", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_evaporation_v3", metavar='S',
                         help='Loaded model name (when resuming)')
     parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
@@ -135,9 +135,9 @@ if __name__ == '__main__':
                         help='batch size (default:32)')
     parser.add_argument('--max-iters', type=int, default=1_000_000, metavar='N',
                         help='number of iterations (default: 1M)')
-    parser.add_argument('--warmup-iters', type=int, default=5_000, metavar='N',
+    parser.add_argument('--warmup-iters', type=int, default=2_000, metavar='N',
                         help='number of iterations (default: 1000)')
-    parser.add_argument('--lr', type=float, default=5e-4, metavar='LR',
+    parser.add_argument('--lr', type=float, default=5e-5, metavar='LR',
                         help='learning rate (default: 1e-4)')
     parser.add_argument('--weight-decay', type=float, default=0.0, metavar='D',
                         help='weight decay (default: 1e-4)')
@@ -266,7 +266,7 @@ if __name__ == '__main__':
             lr_iter = get_lr(epoch)
         else:
             lr_iter = cfg.lr
-        optimizer.param_groups[0]['lr'] = 1e-3#lr_iter
+        optimizer.param_groups[0]['lr'] = lr_iter
         #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.lr_decay_iters)
         train_loss = train(model, train_dl, criterion, optimizer, device)
         val_loss = validate(model, val_dl, criterion, device)
@@ -283,20 +283,6 @@ if __name__ == '__main__':
                 'model_args': model_args,
                 'iter_num': epoch,
                 'train_time': time.time() - time_start + train_time,
-                'LOSS': LOSS_ITR,
-                'LOSS_VAL': LOSS_VAL,
-                'best_val_loss': best_val_loss,
-                'cfg': cfg,
-            }
-            torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
-
-        if ( epoch > 0 ) and ( epoch % 100 == 0):
-            checkpoint = {
-                'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'model_args': model_args,
-                'iter_num': epoch,
-                'train_time': time.time() - time_start,
                 'LOSS': LOSS_ITR,
                 'LOSS_VAL': LOSS_VAL,
                 'best_val_loss': best_val_loss,
