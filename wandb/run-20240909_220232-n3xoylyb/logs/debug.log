@@ -1,0 +1,26 @@
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Current SDK version is 0.17.9
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Configure stats pid to 31672
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Loading settings from C:\Users\ricca\.config\wandb\settings
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Loading settings from C:\Users\ricca\Documents\GitHub\in-context-controller\wandb\settings
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Loading settings from environment variables: {}
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Applying setup settings: {'_disable_service': False}
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Inferring run settings from compute environment: {'program_relpath': 'train_onestep_CL_evaporation_process.py', 'program_abspath': 'C:\\Users\\ricca\\Documents\\GitHub\\in-context-controller\\train_onestep_CL_evaporation_process.py', 'program': 'C:\\Users\\ricca\\Documents\\GitHub\\in-context-controller\\train_onestep_CL_evaporation_process.py'}
+2024-09-09 22:02:32,399 INFO    MainThread:31672 [wandb_setup.py:_flush():77] Applying login settings: {}
+2024-09-09 22:02:32,400 INFO    MainThread:31672 [wandb_init.py:_log_setup():524] Logging user logs to C:\Users\ricca\Documents\GitHub\in-context-controller\wandb\run-20240909_220232-n3xoylyb\logs\debug.log
+2024-09-09 22:02:32,400 INFO    MainThread:31672 [wandb_init.py:_log_setup():525] Logging internal logs to C:\Users\ricca\Documents\GitHub\in-context-controller\wandb\run-20240909_220232-n3xoylyb\logs\debug-internal.log
+2024-09-09 22:02:32,400 INFO    MainThread:31672 [wandb_init.py:init():608] calling init triggers
+2024-09-09 22:02:32,400 INFO    MainThread:31672 [wandb_init.py:init():615] wandb.init called with sweep_config: {}
+config: {}
+2024-09-09 22:02:32,400 INFO    MainThread:31672 [wandb_init.py:init():658] starting backend
+2024-09-09 22:02:32,400 INFO    MainThread:31672 [wandb_init.py:init():662] setting up manager
+2024-09-09 22:02:32,403 INFO    MainThread:31672 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=spawn, using: spawn
+2024-09-09 22:02:32,409 INFO    MainThread:31672 [wandb_init.py:init():670] backend started and connected
+2024-09-09 22:02:32,415 INFO    MainThread:31672 [wandb_init.py:init():768] updated telemetry
+2024-09-09 22:02:32,453 INFO    MainThread:31672 [wandb_init.py:init():801] communicating run to backend with 90.0 second timeout
+2024-09-09 22:02:33,119 INFO    MainThread:31672 [wandb_init.py:init():852] starting run threads in backend
+2024-09-09 22:02:33,502 INFO    MainThread:31672 [wandb_run.py:_console_start():2465] atexit reg
+2024-09-09 22:02:33,502 INFO    MainThread:31672 [wandb_run.py:_redirect():2311] redirect: wrap_raw
+2024-09-09 22:02:33,502 INFO    MainThread:31672 [wandb_run.py:_redirect():2376] Wrapping output streams.
+2024-09-09 22:02:33,502 INFO    MainThread:31672 [wandb_run.py:_redirect():2401] Redirects installed.
+2024-09-09 22:02:33,510 INFO    MainThread:31672 [wandb_init.py:init():895] run started, returning control to user process
+2024-09-09 22:02:47,545 WARNING MsgRouterThr:31672 [router.py:message_loop():77] message_loop has been closed

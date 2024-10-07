@@ -2,8 +2,17 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['ps.fonttype'] = 42
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["mathtext.fontset"] = "cm"
+plt.rcParams['axes.labelsize']=14
+plt.rcParams['xtick.labelsize']=11
+plt.rcParams['ytick.labelsize']=11
+plt.rcParams['axes.grid']=True
+plt.rcParams['axes.xmargin']=0
 
-def problem_data(perturbation, device="cuda:0"):
+def problem_data(perturbation, device="cuda"):
     """ Problem data, numeric constants,... adapted to work on GPU with torch """
 
     perturbation = torch.tensor(perturbation / 100, dtype=torch.float32, device=device)
@@ -91,7 +100,10 @@ def dynamics(x, u, a, b, c, d, e, f, g, h, M, C, UA2, Cp, lam, lams, F1, X1, F3,
     P2_dot = (F4 - F5) / C
 
     # # Return state derivatives as a tensor
-    xdot = torch.cat((X2_dot, P2_dot), dim=1).to(x.device)
+    xdot = torch.empty(x.shape, dtype=x.dtype, device=x.device)
+    xdot[0] = X2_dot
+    xdot[1] = P2_dot
+    # xdot = torch.cat((X2_dot.view(1,-1), P2_dot.view(1,-1)), dim=1).to(x.device)
     return xdot
 
 
@@ -130,8 +142,8 @@ def simulate_evaporation_process(u, data_perturbation, initial_state_perturbatio
         x_dot = dynamics(s, a, *data)
 
         # Integrate dynamics using forward Euler integration
-        y[i, :] = s
-        s_next = s + Ts * x_dot
+        y[i, :] = s# + torch.randn_like(s)
+        s_next = s + Ts * x_dot# + torch.randn_like(y[i, :])
         s = s_next
 
     if save_params:
@@ -141,7 +153,7 @@ def simulate_evaporation_process(u, data_perturbation, initial_state_perturbatio
 
 def generate_prbs(num_steps, perturbation_range=20):
     """Generate a Perturbed Random Binary Signal (PRBS)"""
-    prbs = torch.randint(0, 2, (num_steps, 2), dtype=torch.float32,  device="cuda:0") * 2 - 1  # Randomly choose -1 or 1
+    prbs = torch.randint(0, 2, (num_steps, 2), dtype=torch.float32,  device="cuda") * 2 - 1  # Randomly choose -1 or 1
     prbs *= perturbation_range  # Scale to ±20
     return prbs
 
@@ -151,16 +163,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def main():
+
+    torch.cuda.set_device('cuda:2')
     # Set up parameters
-    num_steps = 500  # Number of time steps per simulation
-    num_simulations = 10 # Number of simulations to run
+    num_steps = 100  # Number of time steps per simulation
+    num_simulations = 20 # Number of simulations to run
 
     # Generate inputs for simulation
-    constant_u = torch.tensor([191.713, 215.888], device="cuda:0")
+    constant_u = torch.tensor([191.713, 215.888], device="cuda")
 
     # Perturbation factor for initial conditions
-    data_pert_perc = 0
-    state_pert = 20
+    data_pert_perc = 5
+    state_pert = 0
 
     # Initialize arrays to store results of each simulation
     x_n_all = np.zeros((num_simulations, num_steps, 2))
@@ -173,10 +187,10 @@ def main():
 
         # use constant input u or perturbed with PRBS
         #u_forced = constant_u + prbs_signal  # Perturb the steady-state input
-        u_forced = constant_u + torch.zeros_like(prbs_signal, dtype=torch.float32, device="cuda:0")
+        u_forced = constant_u + torch.zeros_like(prbs_signal, dtype=torch.float32, device="cuda")
         # u_forced = torch.zeros_like(prbs_signal, dtype=torch.float32,  device="cuda:0")
 
-        x_n, x, y = simulate_evaporation_process(u_forced, data_pert_perc, state_pert, device="cuda:0", noisy = False)
+        x_n, x, y = simulate_evaporation_process(u_forced, data_pert_perc, state_pert, device="cuda", noisy = False)
 
         # Store the results in the preallocated arrays
         x_n_all[sim_id] = x_n.detach().cpu().numpy()
@@ -185,24 +199,22 @@ def main():
 
 
     # Plot the results for all simulations
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(5, 3), constrained_layout=True)
     # Plot the first measurement for all simulations
     plt.subplot(211)
-    plt.plot(y_all[:, :, 0].T, color='blue', alpha=0.5)  # Plotting the first measurement across all simulations
-    plt.xlabel(r'$t \ [s]$')
+    plt.plot(y_all[:, :, 0].T, color='tab:blue', alpha=0.3)  # Plotting the first measurement across all simulations
+    # plt.xlabel('$t$ [s]')
+    plt.tick_params('x', labelbottom=False)
     #plt.ylabel(r'$x_1^0$')
-    plt.ylabel(r'$y_1$')
-    plt.ylim([-10,40])
-    plt.grid()
+    plt.ylabel('$X_2$ [%]')
     # Plot the second measurement for all simulations
     plt.subplot(212)
-    plt.plot(y_all[:, :, 1].T, color='blue', alpha=0.5)  # Plotting the second measurement across all simulations
-    plt.xlabel(r'$t \ [s]$')
+    plt.plot(y_all[:, :, 1].T, color='tab:blue', alpha=0.3)  # Plotting the second measurement across all simulations
+    plt.xlabel('$t$ [s]')
     #plt.ylabel(r'$x_2^0$')
-    plt.ylabel(r'$y_2$')
-    plt.ylim([30, 120])
-    plt.grid()
+    plt.ylabel('$P_2$ [kPa]')
     plt.tight_layout()
+    plt.savefig('evaporation_process_meta_set.pdf')
     plt.show()
 
 if __name__ == "__main__":

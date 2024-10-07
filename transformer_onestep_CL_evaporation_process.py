@@ -18,6 +18,8 @@ class GPTClosedLoop(nn.Module):
 
     def forward(self, data, r, y_d):
 
+        tmp = torch.cat(data, dim=1)
+
         Ts = 1
         device = r.device
         b, t, nr = r.size() # 1,500,2
@@ -45,14 +47,11 @@ class GPTClosedLoop(nn.Module):
 
             # Controller u(t) = C(e(t), u(t-1))
             pred = self.gpt_model(E[:, :i + 1, :], U[:, :i + 1, :])
-
             U[:, i + 1, :] = pred[:, -1, :]  # Just for coherence
 
             # Simulate system response
             for k in range(b):
-
-                x_dot = dynamics(x_i[k], U[k,i+1, :], *data)
-
+                x_dot = dynamics(x_i[k], U[k,i+1, :], *(tmp[k,:].tolist()))
                 # Integrate dynamics using forward Euler integration
                 y_i[k] = x_i[k] + Ts * x_dot
                 x_i[k] = y_i[k].clone()

@@ -1,0 +1,31 @@
+100
+True
+0
+Traceback (most recent call last):
+  File "C:\Users\ricca\Documents\GitHub\in-context-controller\train_onestep_CL_evaporation_process.py", line 221, in <module>
+    checkpoint = torch.load(ckpt_path, map_location=device)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 1014, in load
+    return _load(opened_zipfile,
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 1422, in _load
+    result = unpickler.load()
+             ^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 1392, in persistent_load
+    typed_storage = load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 1366, in load_tensor
+    wrap_storage=restore_location(storage, location),
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 1299, in restore_location
+    return default_restore_location(storage, str(map_location))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 381, in default_restore_location
+    result = fn(storage, location)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 274, in _cuda_deserialize
+    device = validate_cuda_device(location)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricca\anaconda3\envs\sysid-transformers-control\Lib\site-packages\torch\serialization.py", line 265, in validate_cuda_device
+    raise RuntimeError('Attempting to deserialize object on CUDA device '
+RuntimeError: Attempting to deserialize object on CUDA device 3 but torch.cuda.device_count() is 1. Please use torch.load with map_location to map your storages to an existing device.

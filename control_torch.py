@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import torch
+import random
 from torch import zeros, complex, cos, sin, solve
 
 class DiscreteTransferFunction(torch.nn.Module):
@@ -34,7 +35,7 @@ class DiscreteTransferFunction(torch.nn.Module):
 
 def drss_matrices(
         states, inputs, outputs, strictly_proper=False, mag_range=(0.5, 0.97), phase_range=(0, math.pi / 2),
-        dtype=torch.float32, device='cuda'):
+        dtype=torch.float32, device=None):
     """Generate a random state space using PyTorch, running on the GPU.
 
     This does the actual random state space generation expected from rss and
@@ -456,3 +457,8 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def perturb_parameters(param, percentage, device = 'cuda'):
+    set_seed(random.randint(1, 500))
+    perturb = (2*torch.rand_like(param, device=device)-1) * (percentage / 100.0) * param
+    return param + perturb

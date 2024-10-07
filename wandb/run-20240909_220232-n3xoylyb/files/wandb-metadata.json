@@ -1,0 +1,53 @@
+{
+    "os": "Windows-10-10.0.22631-SP0",
+    "python": "3.11.5",
+    "heartbeatAt": "2024-09-09T20:02:33.194908",
+    "startedAt": "2024-09-09T20:02:32.393063",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "C:\\Users\\ricca\\Documents\\GitHub\\in-context-controller\\train_onestep_CL_evaporation_process.py",
+    "codePathLocal": "train_onestep_CL_evaporation_process.py",
+    "codePath": "train_onestep_CL_evaporation_process.py",
+    "git": {
+        "remote": "https://github.com/buswayne/in-context-controller.git",
+        "commit": "7fec6cb8a8462f854514a32fa44e7e1f4a91d833"
+    },
+    "email": "55987194+buswayne@users.noreply.github.com",
+    "root": "C:/Users/ricca/Documents/GitHub/in-context-controller",
+    "host": "LAPTOP-VM3ET39L",
+    "username": "ricca",
+    "executable": "C:\\Users\\ricca\\anaconda3\\envs\\sysid-transformers-control\\python.exe",
+    "cpu_count": 8,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 2304.0,
+        "min": 0.0,
+        "max": 2304.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2304.0,
+            "min": 0.0,
+            "max": 2304.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 475.61132431030273,
+            "used": 456.27880477905273
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 2060",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 2060",
+            "memory_total": 6442450944
+        }
+    ],
+    "memory": {
+        "total": 15.876148223876953
+    }
+}

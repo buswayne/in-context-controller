@@ -130,8 +130,8 @@ class NonlinearCLDataset(Dataset):
             out = out @ self.w2.T + self.b2
             return out
         # Generate data on-the-fly
-        G1 = perturb_matrices(*self.G_01, percentage=0, device=self.device)
-        G2 = perturb_matrices(*self.G_02, percentage=0, device=self.device)
+        G1 = perturb_matrices(*self.G_01, percentage=10, device=self.device)
+        G2 = perturb_matrices(*self.G_02, percentage=10, device=self.device)
         # define reference
         min_val = -10  # Minimum step value
         max_val = 10  # Maximum step value
@@ -151,15 +151,15 @@ if __name__ == "__main__":
     batch_size = 50
 
     # Create dataset and dataloader
-    dataset = LinearCLDataset(seq_len=500, ts=0.01, seed=42, random_start=False)
-    # dataset = NonlinearCLDataset(seq_len=500, ts=0.01, seed=42, random_start=True)
+    # dataset = LinearCLDataset(seq_len=500, ts=0.01, seed=42, random_start=False)
+    dataset = NonlinearCLDataset(seq_len=500, ts=0.01, seed=42, random_start=True)
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
     ts = 1e-2
     T = ts*500# * 2
     t = torch.arange(0, T, ts).view(-1, 1).to("cuda")
 
-    fig = plt.figure(figsize=(5,3))
+    fig = plt.figure(figsize=(4.5,3))
     u = torch.ones_like(t)
 
     G_dict = {}
@@ -171,41 +171,43 @@ if __name__ == "__main__":
 
 
 
-    # def nn_fun(x):
-    #     out = x @ dataset.w1.T + dataset.b1
-    #     out = torch.tanh(out)
-    #     out = out @ dataset.w2.T + dataset.b2
-    #     return out
-    #
-    # for i in range(batch_size):
-    #     batch_G1, batch_G2, batch_r, batch_y_d, batch_y0 = next(iter(dataloader))
-    #     y1 = forced_response(batch_G1[0][0],batch_G1[1][0],batch_G1[2][0],batch_G1[3][0], u)
-    #     y2 = nn_fun(y1)
-    #     y = forced_response(batch_G2[0][0],batch_G2[1][0],batch_G2[2][0],batch_G2[3][0], y1)
-    #     plt.plot(t.cpu(), y.cpu())
-    # plt.show()
+    def nn_fun(x):
+        out = x @ dataset.w1.T * ( 1 + 0 * torch.rand(1, device=x.device)) + dataset.b1 * ( 1 + 0 * torch.rand(1, device=x.device))
+        out = torch.tanh(out)
+        out = out @ dataset.w2.T * ( 1 + 0 * torch.rand(1, device=x.device)) + dataset.b2 * ( 1 + 0 * torch.rand(1, device=x.device))
+        return out
+
+    for i in range(batch_size):
+        batch_G1, batch_G2, batch_r, batch_y_d = next(iter(dataloader))
+        y1 = forced_response(batch_G1[0][0],batch_G1[1][0],batch_G1[2][0],batch_G1[3][0], u)
+        y2 = nn_fun(y1)
+        y = forced_response(batch_G2[0][0],batch_G2[1][0],batch_G2[2][0],batch_G2[3][0], y1)
+        plt.plot(t.cpu(), u.cpu(), label='$r$', c='k', linewidth=1)
+        plt.plot(t.cpu(), y.cpu(), label='$y$', c='tab:blue', alpha=0.2)
 
 
     # ts = 1e-2
 
-    for i in range(batch_size):
-        batch_G, batch_r, batch_y_d = next(iter(dataloader))
+    # for i in range(batch_size):
+    #     batch_G, batch_r, batch_y_d = next(iter(dataloader))
+    #
+    #     T = batch_r.shape[1] * ts  # ts*self.seq_len# * 2
+    #     t = np.arange(0, T, ts)
+    #     y = forced_response(batch_G[0][0], batch_G[1][0], batch_G[2][0], batch_G[3][0], u)
+    #
+    #     # plt.subplot(211)
+    #     # plt.plot(t, batch_r[0, :, 0].cpu(), c='k', alpha=0.2, label='$r$')
+    #     # plt.plot(t, batch_y_d[0, :, 0].cpu(), c='tab:red', alpha=0.2, label='$y_d$')
+    #     # plt.ylabel("$y_L$")
+    #     # plt.xlabel("$t$ [s]")
 
-        T = batch_r.shape[1] * ts  # ts*self.seq_len# * 2
-        t = np.arange(0, T, ts)
-        y = forced_response(batch_G[0][0], batch_G[1][0], batch_G[2][0], batch_G[3][0], u)
+        # plt.subplot(111)
+        # plt.plot(t, u.cpu(), label='$r$', c='k', linewidth=1)
+        # plt.plot(t, y.cpu(), label='$y$', c='tab:blue', alpha=0.2)
+        # plt.xlim([0, 1])
+    plt.legend(['$u$','$y$'])
+    plt.xlabel('$t$ [s]')
 
-        # plt.subplot(211)
-        # plt.plot(t, batch_r[0, :, 0].cpu(), c='k', alpha=0.2, label='$r$')
-        # plt.plot(t, batch_y_d[0, :, 0].cpu(), c='tab:red', alpha=0.2, label='$y_d$')
-        # plt.ylabel("$y_L$")
-        # plt.xlabel("$t$ [s]")
-
-        plt.subplot(111)
-        plt.plot(t, u.cpu(), label='$r$', c='k', linewidth=1)
-        plt.plot(t, y.cpu(), label='$y$', c='tab:blue', alpha=0.2)
-        plt.xlim([0, 3])
-        plt.legend(['$u$','$y$'])
-        plt.xlabel('$t$ [s]')
-
+    plt.tight_layout()
+    plt.savefig('nonlinear_dataset.pdf')
     plt.show()

@@ -2,6 +2,12 @@ import torch
 import matplotlib.pyplot as plt
 
 
+def prbs(num_steps, perturbation_range=20):
+    """Generate a Perturbed Random Binary Signal (PRBS)"""
+    prbs = torch.randint(0, 2, (num_steps, 1), dtype=torch.float32,  device="cuda") * 2 - 1  # Randomly choose -1 or 1
+    prbs *= perturbation_range  # Scale to ±20
+    return prbs
+
 def steps_sequence(T, Ts, min_val, max_val, min_duration, max_duration, device='cuda'):
     # Ensure device is set correctly
     device = torch.device(device if torch.cuda.is_available() else 'cpu')

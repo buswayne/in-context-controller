@@ -12,6 +12,7 @@ from transformer_onestep_CL_evaporation_process import GPTClosedLoop
 import tqdm
 import argparse
 import warnings
+import wandb
 
 
 # Disable all user warnings
@@ -21,6 +22,12 @@ warnings.filterwarnings("ignore")
 
 # Re-enable user warnings
 warnings.filterwarnings("default")
+
+# start a new wandb run to track this script
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="in-context controller"
+)
 
 
 def train(model, dataloader, criterion, optimizer, device):
@@ -32,17 +39,11 @@ def train(model, dataloader, criterion, optimizer, device):
         batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
         optimizer.zero_grad()
+
         batch_y = model(batch_G, batch_r, batch_y_d)
 
-        loss = criterion(batch_y, batch_y_d)
-        #print("batch_y requires_grad:", batch_y.requires_grad)
-        #print("batch_y grad_fn:", batch_y.grad_fn)
-        #print("batch_y_d requires_grad:", batch_y_d.requires_grad)
-        #print("batch_y_d grad_fn:", batch_y_d.grad_fn)
-        #print("loss requires_grad:", loss.requires_grad)
-        #print("loss grad_fn:", loss.grad_fn)
+        loss = criterion(batch_y[:, :, 0], batch_y_d[:, :, 0])
 
-        # loss.backward()
         loss.backward()
         optimizer.step()
 
@@ -68,7 +69,7 @@ def validate(model, dataloader, criterion, device):
             batch_r, batch_y_d = batch_r.to(device), batch_y_d.to(device)
 
             batch_y = model(batch_G, batch_r, batch_y_d)
-            loss = criterion(batch_y, batch_y_d)
+            loss = criterion(batch_y[:, :, 0], batch_y_d[:, :, 0])
 
             running_loss += loss.item()
 
@@ -82,9 +83,9 @@ if __name__ == '__main__':
     # Overall
     parser.add_argument('--model-dir', type=str, default="out", metavar='S',
                         help='Saved model folder')
-    parser.add_argument('--out-file', type=str, default="ckpt_onestep_evaporation_v3", metavar='S',
+    parser.add_argument('--out-file', type=str, default="ckpt_onestep_evaporation_v11", metavar='S',
                         help='Saved model name')
-    parser.add_argument('--in-file', type=str, default="ckpt_onestep_evaporation_v3", metavar='S',
+    parser.add_argument('--in-file', type=str, default="ckpt_onestep_evaporation_v11", metavar='S',
                         help='Loaded model name (when resuming)')
     parser.add_argument('--init-from', type=str, default="resume", metavar='S',
                         help='Init from (scratch|resume|pretrained)')
@@ -135,9 +136,9 @@ if __name__ == '__main__':
                         help='batch size (default:32)')
     parser.add_argument('--max-iters', type=int, default=1_000_000, metavar='N',
                         help='number of iterations (default: 1M)')
-    parser.add_argument('--warmup-iters', type=int, default=2_000, metavar='N',
+    parser.add_argument('--warmup-iters', type=int, default=5_000, metavar='N',
                         help='number of iterations (default: 1000)')
-    parser.add_argument('--lr', type=float, default=5e-5, metavar='LR',
+    parser.add_argument('--lr', type=float, default=1e-4, metavar='LR',
                         help='learning rate (default: 1e-4)')
     parser.add_argument('--weight-decay', type=float, default=0.0, metavar='D',
                         help='weight decay (default: 1e-4)')
@@ -183,22 +184,23 @@ if __name__ == '__main__':
     model_dir.mkdir(exist_ok=True)
 
     # Configure compute
-    cuda_device = "cuda:0"
+    cuda_device = "cuda:2"
+
     torch.set_num_threads(cfg.threads)
     use_cuda = not cfg.no_cuda and torch.cuda.is_available()
     device_name = cuda_device if use_cuda else "cpu"
     device = torch.device(device_name)
     device_type = 'cuda' if 'cuda' in device_name else 'cpu' # for later use in torch.autocast
     torch.set_float32_matmul_precision("high")
-
+    torch.cuda.set_device(device)
     print(torch.cuda.is_available())
     print(torch.cuda.current_device())
 
-    train_ds = EvaporationDataset(seq_len=cfg.seq_len, ts=1)
+    train_ds = EvaporationDataset(seq_len=cfg.seq_len, ts=1, data_perturb_percentage=5, device=device)
     train_dl = DataLoader(train_ds, batch_size=cfg.batch_size)
 
     # if we work with a constant model we also validate with the same (thus same seed!)
-    val_ds = EvaporationDataset(seq_len=cfg.seq_len, ts=1)
+    val_ds = EvaporationDataset(seq_len=cfg.seq_len, ts=1, data_perturb_percentage=5, device=device)
     val_dl = DataLoader(val_ds, batch_size=cfg.eval_batch_size)
 
     # Model
@@ -290,6 +292,7 @@ if __name__ == '__main__':
             }
             torch.save(checkpoint, model_dir / f"{cfg.out_file}.pt")
 
-        print(f"Epoch [{epoch + 1}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+        print(f"Epoch [{epoch}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, LR: {optimizer.param_groups[0]['lr']:.6f}")
+        wandb.log({"epoch": epoch, "loss": train_loss, "val_loss": val_loss})
 
     print("Training complete. Best model saved as 'best_model.pth'.")
